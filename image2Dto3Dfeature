@@ -1,0 +1,82 @@
+import torch
+import einops
+import torch.nn as nn
+import torch.nn.functional as f
+#demo 2D image features to 3D grid features
+
+bs                      = 2
+image_channel           = 64
+image_h                 = 2
+image_w                 = 2
+num_depth_step          = 4
+grid_z                  = 10
+grid_y                  = 10
+grid_x                  = 10
+
+result_bev_feature      = torch.zeros((bs, image_channel, grid_z, grid_y, grid_x)).permute(0, 2, 3, 4, 1).reshape(bs, -1, image_channel)
+# print(result_bev_feature.shape)
+
+
+# print(result_bev_feature.shape)
+
+# 4 X 3 X 2 X 2
+pixel2grid_map          = torch.tensor([[[[4, 4],
+		                                  [5, 5]],
+
+		                                 [[4, 5],
+		                                  [4, 5]],
+
+		                                 [[0, 0],
+		                                  [0, 0]]],
+
+		                                [[[3, 3],
+		                                  [6, 6]],
+
+		                                 [[3, 6],
+		                                  [3, 6]],
+
+		                                 [[3, 3],
+		                                  [3, 3]]],
+
+		                                [[[2, 2],
+		                                  [7, 7]],
+
+		                                 [[1, 8],
+		                                  [1, 8]],
+
+		                                 [[6, 6],
+		                                  [6, 7]]],
+
+		                                [[[0, 0],
+		                                  [9, -1]],
+
+		                                 [[0, 9],
+		                                  [0, -1]],
+
+		                                 [[9, 9],
+		                                  [9, -1]]]])
+
+
+pixel2grid_index = pixel2grid_map[:, 0, :, :] * grid_y * grid_x +  pixel2grid_map[:, 1, :, :] * grid_x +  pixel2grid_map[:, 2, :, :]
+pixel2grid_index = pixel2grid_index.reshape(-1)
+
+
+
+conv_img2depth          = nn.Conv2d(in_channels=image_channel, out_channels=num_depth_step, kernel_size=1)
+
+image_feature           = torch.rand((bs, image_channel, image_h, image_w), dtype=torch.float32)
+depth_portion           = f.softmax(input=conv_img2depth(image_feature), dim=1)
+
+image_portion_feature = image_feature.unsqueeze(dim=2) * depth_portion.unsqueeze(dim=1)
+image_portion_feature = image_portion_feature.permute(0, 2, 3, 4, 1).reshape(bs, -1, image_channel)
+
+pixel2grid_mask = (pixel2grid_index >= 0).reshape(1, -1, 1)
+image_select_feature = image_portion_feature * pixel2grid_mask
+
+
+result_bev_feature[:, pixel2grid_index, :] = image_select_feature
+
+result_bev_feature = result_bev_feature.reshape(bs, grid_z, grid_y, grid_x, image_channel).permute(0, 4, 1, 2 ,3)
+
+print(result_bev_feature[0, 0, :, :, 9])
+print(result_bev_feature[1, 0, :, :, 9])
