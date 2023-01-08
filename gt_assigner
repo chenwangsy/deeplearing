@@ -1,0 +1,88 @@
+import iou
+import numpy as np
+
+
+class GtAssigner:
+
+    # match规则
+    # 1. 一个真值可以匹配上多个预测框
+    # 2. 一个预测框只能被使用一次
+
+    def __init__(self, num_one_gt_max_pred=3, num_pos_iou=0.6, num_neg_iou=0.3, num_neg_rate=3):
+        '''
+        num_one_gt_max_pred: 一个真值可以最大匹配多少个预测框，当该值为1时代表真值框和预测框具有一一对应关系
+        num_pos_iou: 预测框与某一个真值框大于该值才有机会成为正样本
+        num_neg_iou: 预测框与所有真值框都小于该值则有机会成为负样本
+        num_neg_rate: 假设统计出来正样本为k个，则最多可以有num_neg_rate * k个负样本，该值的引入为了保持正负样本的比例相对平衡
+        '''
+        assert num_one_gt_max_pred > 0
+        assert 0 < num_pos_iou and num_pos_iou <= 1
+        assert 0 < num_neg_iou and num_neg_iou < num_pos_iou
+        assert 0 < num_neg_rate and isinstance(num_neg_rate, int)
+
+        self.num_one_gt_max_pred = num_one_gt_max_pred
+        self.num_pos_iou         = num_pos_iou
+        self.num_neg_iou         = num_neg_iou
+        self.num_neg_rate        = num_neg_rate
+
+    def assign(self, gt, pred):
+        """
+        gt: np.array n1 x 4         x1 y1 x2 y2
+        pred: np.array n2 x 4       x1 y1 x2 y2
+        return np.array match_res    n2 x 2      第一列代表为什么样本 1为正样本 0为负样本 -1为未分配预测框 第二列代表分配的gt的索引，该值仅在第一列为1时才有意义
+                np.array gt_match_count n1  每个gt被分配了多少个预测框
+        """
+        num_gt              = len(gt)
+        num_pred            = len(pred)
+        match_res           = np.ones((num_pred, 2)) * -1
+        pos_ious, _         = iou.bboxes_iou(pred, gt)
+        neg_ious            = np.copy(pos_ious)
+        gt_match_count      = np.zeros(num_gt, dtype=np.int32)
+
+        #assign pos samples
+        while (1):
+            max_iou         = np.max(pos_ious)
+            if max_iou < self.num_pos_iou:
+                break
+            max_iou_idx     = np.unravel_index(np.argmax(pos_ious), pos_ious.shape)
+            pred_idx        = max_iou_idx[0]
+            gt_idx          = max_iou_idx[1]
+            if gt_match_count[gt_idx] < self.num_one_gt_max_pred:
+                gt_match_count[gt_idx] += 1
+                match_res[pred_idx, 0] = 1
+                match_res[pred_idx, 1] = gt_idx
+            pos_ious[pred_idx, :] = 0
+
+        #assign neg samples
+        num_pos_sample      = np.sum(gt_match_count)                            #正样本个数
+        neg_sample_mask     = (neg_ious < self.num_neg_iou).all(axis=1)         #所有可能的负样本mask
+        num_neg_sample      = min(num_pos_sample * self.num_neg_rate, num_pred - num_pos_sample, np.sum(neg_sample_mask))   #确定负样本个数
+        neg_max_gt_iou = np.where(neg_sample_mask == False, 1, neg_ious.max(axis=1))            #计算每一个pred与所有gt的最大iou, 用neg_sample_mask保留潜在的负样本，其余的被设置为1
+        neg_mask = np.argsort(neg_max_gt_iou)[:num_neg_sample]                  #取出前num_neg_sample个最小的 "pred与所有gt的最大iou"
+        match_res[neg_mask, 0] = 0
+
+        return match_res, gt_match_count
+
+
+if __name__ == "__main__":
+
+    gt = np.array([[40, 40, 60, 60.0],
+                   [60, 60, 80, 80.0],
+                   [80, 80, 100, 110.0]])
+
+    pred = np.array([[40, 40, 60, 60.0],
+                     [40, 40, 60, 60.2],
+                     [40, 40, 60, 60.3],
+                     [40, 40, 60, 60.4],
+                     [40, 40, 60, 59.9],
+                     [4, 40, 60, 49.9],
+                     [4, 40, 60, 79.9],
+                     [40, 40, 60, 129.9],
+                     [80, 80, 100, 110.0]])
+
+    assigner = GtAssigner(num_one_gt_max_pred=2, num_neg_iou=0.3)
+    assign_res, gt_count = assigner.assign(gt, pred)
+
+
+    print(assign_res)
+    print(gt_count)
