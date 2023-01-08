@@ -1,0 +1,76 @@
+import math
+import numpy as np
+
+#-------------------------------------------------------------------------------
+#本文件实现了iou giou diou ciou的numpy版本，输入都是两组boxes，假设分别为 A x 4， B x 4，则输出的结果iou为A x B的二维矩阵
+
+#输入的X Y 都是 x1 y1 x2 y2的bbox描述形式
+
+#相当于对于A内的每一个box，计算B内每一个box与它的iou, 因此是一个双重遍历的思想
+
+#为了减少代码量，在设计时函数的返回值反回了额外信息，不需要忽略即可。
+
+#---------------------------------------------numpy-----------------------------------
+def bboxes_iou(boxes1, boxes2):
+    """
+    boxes1 : A x 4   x1 y1 x2 y2
+    boxes2 : B x 4   x1 y1 x2 y2
+    res    : A x B
+    """
+    xy_max = np.minimum(boxes1[:, None, 2:], boxes2[None, :, 2:])                #A x B x 2
+    xy_min = np.maximum(boxes1[:, None, :2], boxes2[None, :, :2])                #A x B x 2
+    inter  = np.prod(xy_max - xy_min, axis=2) * (xy_max > xy_min).all(axis=2)    #A X B
+    area1  = np.prod(boxes1[:, 2:] - boxes1[:, :2], axis=1)                      #A
+    area2  = np.prod(boxes2[:, 2:] - boxes2[:, :2], axis=1)                      #B
+    union  = area1[:, None] + area2[None, :] - inter                             #A X B
+    iou    = inter / union                                                       #A X B
+    return iou, union
+
+def bboxes_giou(boxes1, boxes2):
+    """
+    boxes1 : A x 4   x1 y1 x2 y2
+    boxes2 : B x 4   x1 y1 x2 y2
+    res    : A x B
+    """
+    xy_max          = np.maximum(boxes1[:, None, 2:], boxes2[None, :, 2:])      #A x B x 2
+    xy_min          = np.minimum(boxes1[:, None, :2], boxes2[None, :, :2])      #A x B x 2
+    min_closure     = np.prod(xy_max - xy_min, axis=2)                          #A x B
+    iou, union      = bboxes_iou(boxes1, boxes2)
+    giou            = iou - (min_closure - union) / min_closure                 #A x B
+    return giou, iou
+
+def bboxes_diou(boxes1, boxes2):
+    """
+    boxes1 : A x 4   x1 y1 x2 y2
+    boxes2 : B x 4   x1 y1 x2 y2
+    res    : A x B
+    """
+    xy_max          = np.maximum(boxes1[:, None, 2:], boxes2[None, :, 2:])                                      #A x B x 2
+    xy_min          = np.minimum(boxes1[:, None, :2], boxes2[None, :, :2])                                      #A x B x 2
+    d2              = np.sum(np.square(xy_max - xy_min), axis=2)                                                #A x B
+    ctr_b1          = (boxes1[:, 2:] + boxes1[:, :2]) / 2                                                       #A x 2
+    ctr_b2          = (boxes2[:, 2:] + boxes2[:, :2]) / 2                                                       #B x 2
+    phi2            = np.sum(np.square(np.absolute(ctr_b1[:, None, :] - ctr_b2[None, :, :])), axis=2)           #A x B
+    iou, _          = bboxes_iou(boxes1, boxes2)
+    diou            = iou - phi2 / d2
+    return diou, iou
+
+def bboxes_ciou(boxes1, boxes2):
+    """
+    boxes1 : A x 4   x1 y1 x2 y2
+    boxes2 : B x 4   x1 y1 x2 y2
+    res    : A x B
+    """
+    wh_b1           = boxes1[:, 2:] - boxes1[:, :2]                             #A x 2
+    wh_b2           = boxes2[:, 2:] - boxes2[:, :2]                             #B x 2
+    wh_b1_arctan = np.arctan(wh_b1[:, 0] / wh_b1[:, 1])
+    wh_b2_arctan = np.arctan(wh_b2[:, 0] / wh_b2[:, 1])
+    v = 4 / (math.pi * math.pi) * (np.square(wh_b1_arctan[:, None] - wh_b2_arctan[None, :]))
+    diou, iou       = bboxes_diou(boxes1, boxes2)
+    alpha           = v / (1 - iou + v)
+    ciou            = diou - alpha * v
+    return ciou
+
+#TODO 添加torch tensor输入的版本
+#---------------------------------------------torch----------------------------------
+import torch
