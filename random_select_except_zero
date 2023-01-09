@@ -1,0 +1,27 @@
+import torch
+
+def random_select_except_zero(input, k):
+	"""
+	:param input: tensor with any shape but with rank 4
+	:param k: num nonzero element to keep
+	:return: tensor shape like input
+	"""
+	nonzero_idx = torch.nonzero(input)      #返回非零元素的索引，shape为 n x r, n为非零元素个数 r为输入的rank
+	num_nonzero = len(nonzero_idx)
+	if num_nonzero <= k:
+		return input
+	setzero_idx = nonzero_idx[torch.randperm(num_nonzero)[:num_nonzero-k]]  #利用randperm随机排列的整数来取出要设置为0的索引
+
+	input[setzero_idx[:, 0], setzero_idx[:, 1], setzero_idx[:, 2], setzero_idx[:, 3]] = 0 #很骚的玩索引的方式...贼实用嗷~~
+	return input
+
+if __name__ == "__main__":
+	t = torch.rand(1, 1, 4, 4)
+	t[0, 0, 0, 0] = 0
+	t[0, 0, 1, 1] = 0
+	t[0, 0, 2, 2] = 0
+	t[0, 0, 3, 3] = 0
+
+	print(t)
+	res = random_select_except_zero(t, 10)
+	print(res)
