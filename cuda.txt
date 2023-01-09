@@ -1,0 +1,24 @@
+cuda特性总结：    
+    1. 对于计算能力为7.5的图灵架构GPU而言，1个SM被分割为了4个SM sub partition，每个SMSP各有一个warp scheduler，每个SMSP有8个warp slot可以使得scheduler进行指令分配并保持active， 因此一个SM理论上最多可以容纳32个warp同时运行。
+    
+    2. 一个block内的所有warp/thread 都只能在一个SM内运行。
+    
+    3. 在一个SM中可能同时有来自不同块的warp。当一个块中的warp在进行访存或者同步等高延迟操作时，另一个块可以占用SM中的计算资源。这样，在SM内就实现了简单的乱序执行。不同块之间的执行没有顺序，完全并行。
+    
+    4. 在执行时，GPU的任务分配单元（global block scheduler）将网格分配到GPU芯片上。启动CUDA 内核时，需要将网格信息从CPU传输到GPU。任务分配单元根据这些信息将块分配到SM上。任务分配单元使用的是轮询策略：轮询查看SM是否还有足够的资源来执行新的块，如果有则给SM分配一个新的块，如果没有则查看下一个SM。决定能否分配的因素有：每个块使用的共享存储器数量，每个块使用的寄存器数量，以及其它的一些限制条件。任务分配单元在SM的任务分配中保持平衡，但是程序员可以通过更改块内线程数，每个线程使用的寄存器数和共享存储器数来隐式的控制，从而保证SM之间的任务均衡。任务以这种方式划分能够使程序获得了可扩展性：由于每个子问题都能在任意一个SM上运行，CUDA程序在核心数量不同的处理器上都能正常运行，这样就隐藏了硬件差异。
+    
+    5. 从Kepler系列的GPU(计算能力为3.0或更高)，洗牌指令作为一种机制被加入其中，只要两个线程在相同的线程束中，那么就允许这两个线程直接读取另一个线程的寄存器。洗牌指令使得线程束中的线程彼此之间可以直接交换数据，而不是通过共享内存或全局内存来进行的。洗牌指令比共享内存有更低的延迟，并且该指令在执行数据交换时不消耗额外的内存。因此，洗牌指令为应用程序快速交换线程束中线程中线程间的数据提供了一个有吸引力的方法。
+    
+参考资料：
+
+    Cuda学习笔记（一）——sm流处理器簇对blocks的调度策略
+    https://blog.csdn.net/GH234505/article/details/51115994
+
+    Nsight Compute(NCU) Scheduler Statistics 数据解读
+    https://blog.csdn.net/o0haidee0o/article/details/127408244 
+
+    CUDA中Occupancy相关知识
+    Nsight Compute(NCU) Scheduler Statistics 数据解读
+
+    cuda 怎么读_CUDA微架构与指令集（5）-Independent Thread Scheduling
+    https://blog.csdn.net/weixin_39632467/article/details/109991581
