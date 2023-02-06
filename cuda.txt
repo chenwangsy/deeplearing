@@ -1,0 +1,2 @@
+    对于计算能力为7.5的图灵架构GPU而言，1个SM被分割为了4个SM sub partition，每个SMSP各有一个warp scheduler，每个SMSP有8个warp slot可以使得scheduler进行指令分配并保持active
+因此一个SM理论上最多可以容纳32个warp同时运行。
