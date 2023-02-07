@@ -17,3 +17,6 @@ cuda特性总结：
 
     CUDA中Occupancy相关知识
     Nsight Compute(NCU) Scheduler Statistics 数据解读
+
+    cuda 怎么读_CUDA微架构与指令集（5）-Independent Thread Scheduling
+    https://blog.csdn.net/weixin_39632467/article/details/109991581
