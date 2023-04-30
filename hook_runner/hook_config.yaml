@@ -1,0 +1,6 @@
+print_hook:
+    TYPE: 'PrintHook'
+    ID: 100
+
+save_hook:
+    TYPE: 'SaveHook'
