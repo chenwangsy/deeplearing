@@ -1,0 +1,9 @@
+LR_HOOK_CONFIG:
+    TYPE: 'OneCycleLrUpdaterHook'
+    MAX_LR: 0.003
+    PCT_START: 0.3
+    ANNEAL_STRATEGY: 'cos'
+    DIV_FACTOR: 10
+    FINAL_DIV_FACTOR: 10000
+    THREE_PHASE: False
+    PRIORITY : 'VERY_HIGH'
