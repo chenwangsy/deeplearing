@@ -1,0 +1,15 @@
+OneCycleLrUpdaterHook -> LrUpdaterBaseHook -> UpdaterBaseHook -> (Hook, Updater)
+
+对于OneCycleLrUpdaterHook来说，这个继承关系内使得warmup相关的类方法无意义，因此作用大的函数如下所示：
+OneCycleLrUpdaterHook：before_run  			->   进行一些初始化，最核心的是就是在optim内记录好initial_lr并定义好lr_phases
+			     get_value   			->  计算出optim当前iter的学习率
+
+LrUpdaterBaseHook	：      _set_value  			->    将OneCycleLrUpdaterHook.get_value计算出的学习率赋值给optim
+
+
+UpdaterBaseHook：	     before_train_iter 		->  完成整体外层调用，其中使用了get_regular_value
+
+
+Updater：		     get_regular_value		->    由于optim内有两个param_groups，因此该函数就是完成了一个循环遍历
+
+Hook：			    各个阶段调用函数		->  完成hook的定点触发
