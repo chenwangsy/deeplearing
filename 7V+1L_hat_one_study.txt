@@ -1,0 +1,140 @@
+YN&$d2CKD*&X
+
+模型配置传入参数：
+backbone <class 'dict'>		 	前视主干
+bifpn_neck <class 'dict'>			前视neck
+side_backbone <class 'dict'>			周视主干
+side_bifpn_neck <class 'dict'>			周视neck
+narrow_backbone <class 'dict'>		长焦主干
+narrow_bifpn_neck <class 'dict'>		长焦neck
+
+___________________________________________________________________
+1. 
+lidar_feature_cat       RadFeatureConcat                  激光雷达时序特征直接拼接，当前5帧时序特征，bs=1，输出结果为5 x 32 x 368 x 608
+
+2. 
+lidar_neck <class 'dict'>		#应该是指的lidar_backbone		输出为 5 x 32 x 184 x 304, 5 x 64 x 92 x 192, 5 x 128 x 46 x 76, 5 x 256 x 23 x 38
+{'type': 'LidarBEVBackbone', 'input_channel': 32, 'layer_nums': [3, 5, 5, 5], 'layer_strides': [2, 2, 2, 2], 'num_filters': [32, 64, 128, 256]}
+
+3. 
+lidar_temporal_fusion <class 'dict'>	#这个模型把lidar时序信息进行了融合，需要知道其输出是什么样的  输入仅使用了5 x 32 x 184 x 304这一个neck特征，输出特征尺寸为1 x 64 x 184 x 304
+{'type': 'SuperFPSTemporalModule', 'input_shape': (184, 304), 'in_channels': 64, 'temporal_length_each_batch': 5, 'grid_quant_scale': 0.015625, 'num_extra_encoder_layers': 2, 'fusion_module': 
+{'type': 'TemporalSimpleFusion', 'in_channels': 64, 'num_frames': 2, 'fusion_method': 'cat', 'use_decay': True, 'decay_rate': 0.2}, 'share_conv_in_channels': 32, 'share_conv_out_channels': 64, 'bn_kwargs': {'eps': 1e-05, 'momentum': 0.1}}
+
+4. 
+fusion_module <class 'dict'> 输入：激光1 x 64 x 184 x 304 -> 1 x 64 x 256 x 256, 视觉1 x 48 x 352 x 256 -> 1 x 48 x 256 x 256  concat: 1 x 112 x 256 x 256 输出：1 x 128 x 256 x 256
+
+lidar和camera feature变化形状使用了F.gridsample函数
+
+{'type': 'LidarCameraFusionModule', 'lidar_feat_channels': 64, 'camera_feat_channels': 48, 'out_channel': 128, 'fusion_feat_shape': (256, 256), 'lidar_vcs_range': (3, -36.8, 124.6, 36.8), 'camera_vcs_range': (-35.2, -51.2, 105.6, 51.2), 'fusion_vcs_range': (-35.2, -76.8, 118.4, 76.8)}
+
+5.
+lidar_bbox_head
+{'type': 'AfdetHead', 'in_channels': 128, 'bn_kwargs': {'eps': 1e-05, 'momentum': 0.1}, 'num_class': 3, 'common_heads': {'reg': (2, 2), 'height': (1, 2), 'dim': (3, 2), 'rot': (2, 2)}, 'share_conv_channel': 48, 'quantize': False, 'split_hm_head': False}
+
+
+
+
+6. 
+lidar_loss_det <class 'dict'>
+{'type': 'AfdetLidarLoss', 'weight': 2, 'weight_iou': [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0], 'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 'split_hm_head': False, 'use_gaussian_reg_loss': True}
+
+7. 模型预测阶段的头：
+predict_det   AfdetPredict  训练的头和输出预测结果的头是分开的，为什么？
+
+_______________________________________________________________________________________________________________________________________________________________________________
+
+vfe <class 'dict'>
+{'type': 'PillarFeatureNet', 'num_input_features': 4, 'num_filters': (32,), 'with_distance': False, 'pool_size': (1, 1), 'voxel_size': (0.2, 0.2, 0.2), 'pc_range': (3, -36.8, -2.5, 124.6, 36.8, 4.5), 'bn_kwargs': None, 'quantize': False, 'use_conv': False, 'normalize_xyz': False}
+
+scatter <class 'dict'>
+{'type': 'PointPillarScatter', 'num_input_features': 32, 'quantize': False}
+
+lidar_feature_cat <class 'dict'>
+{'type': 'RadFeatureConcat'}
+
+
+
+
+
+cam_feats_extraction <class 'dict'>
+
+
+bev_fusion <class 'dict'>
+这个有啥用 应该是没有用的？
+{'type': 'BEVFusionModule', 'grid_quant_scale': 0.015625, 'random_rotation_cfg': None, 'drop_view_prob': 0.0, 'bev_fusion_input_name': 'pred_segs_frame0', 'bev_fusion_out_name': 'bev_stage2_input', 'views': [1, 5, 1], 'ipm_output_size': (352, 256), 'use_homo_offset': True, 'block_warp_padding': [(0, 0, 0, 88), (0, 128, 0, 0), (128, 0, 0, 0), (0, 128, 0, 0), (128, 0, 0, 0), (0, 0, 264, 0), (0, 0, 0, 88)], 'vcs_plane_nums': 4}
+
+fusion_upsampling <class 'dict'>
+bev_stage2_backbone <class 'dict'>
+bev_stage2_neck <class 'dict'>
+bev_fusion_small <class 'dict'>
+fusion_upsampling_small <class 'dict'>
+bev_stage2_backbone_small <class 'dict'>
+bev_stage2_neck_small <class 'dict'>
+combine_dict <class 'function'>
+get_item_from_dict <class 'function'>
+get_part_dict <class 'function'>
+get_item_from_list <class 'function'>
+generate_offset <class 'dict'>
+generate_offset_small <class 'dict'>
+temporal_fusion <class 'dict'>
+temporal_fusion_small <class 'dict'>
+front_bev_stage1_head <class 'dict'>
+side_bev_stage1_head <class 'dict'>
+narrow_bev_stage1_head <class 'dict'>
+
+
+
+建立网络的调用顺序：
+
+486行传入了拓扑参数 task_builders = [i.topo_builder for i in CONFIGS]
+
+entry.py第800行建立了模型的配置文件参数，最重要的输入为
+
+nodes是各个子模块模型，或者计算损失函数的操作
+nodes = dict(**copy.deepcopy(common_nodes), **config_nodes,),
+
+拓扑构造器把规定了forward运行的流程，他可以仅使用部分nodes完成前向推理。
+topology_builder = get_topo_builder(mode="train")
+get_topo_builder函数中最终调用了multimodel_detection中的def topo_builder(nodes, _inputs, feats, mode): 该函数内定义了forward的拓扑关系
+调用如下：
+def topo_builder(nodes, _inputs, feats, mode):
+    name2out = OrderedDict()
+
+    fused_feats = mmfusion_topo_builder(nodes, _inputs, feats, mode)					#其中调用了视觉和lidar的base部分直至融合特征输出，lidar的来自于lidar_base.py
+    name2out[task_name] = lidar_detection_topo_builder(						#调用了lidar_det任务拓扑函数，来自于lidar/detection/detection.py配置中
+        nodes, _inputs, fused_feats, mode, gt_range=mmfusion_vcs_range
+    )
+
+
+20240424————————如何把det head集成进入网络的测试
+entyp.py 		CONFIGS 每一个config的node属性记录了模型结构
+		CONFIGS = init_task_config(CCONFIG.CONFIGS)
+		CCONFIG = BASE_CONFIG.CCONFIG
+		BASE_CONFIG = Config.fromfile(os.path.join(cfg_dir, "base.py"))
+
+base.py 		CCONFIG = get_config(model_type)  其中model_type = lidar-bev-fusion-mt-7v-wide-main
+
+lidar-bev-fusion-mt-7v-wide-main.py中
+		CONFIGS = [
+    			os.path.join(root, 'bev/bev_3d/bev_3d_vehicle_fusion.py'),
+    			os.path.join(root, 'bev/bev_3d/bev_3d_vrumerge_fusion.py'),]
+
+
+20240425————————HAT框架细节记录
+当前目标检测头训练输出的结果为普通字典，但由于模型被外部包装了一层，因此输出最终变为了OrderedOutput类型。
+
+
+
+
+模型node['get_part_dict']是一个函数，其来源是get_bev_common_nodes(mode="train")。该函数主要的作用是可以方便对于字典进行筛选
+
+
+
+
+['timestamp', 'view', 'pack_dir', 'temporal_info', 'img_paths', 'gt_bev_3d', 'annos_bev_3d', 'meta_info', 'side_img', 'narrow_img', 'pillar_data', 'pillar_shape', 'pillar_num_points', 'num_pillars', 'pillar_coordinates', 'have_lidar_input', 'object_token']
+
+
+AssertionError: gt_bev_dynamic_anno not in input names: dict_keys(['img', 'timestamp', 'view', 'pack_dir', 'temporal_info', 'img_paths', 'gt_bev_3d', 'annos_bev_3d', 'meta_info', 'side_img', 'narrow_img', 'pillar_data', 'pillar_shape', 'pillar_num_points', 'num_pillars', 'pillar_coordinates', 'have_lidar_input', 'object_token', 'lidar_det_gt'])
+
+
