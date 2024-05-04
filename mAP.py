@@ -133,7 +133,18 @@ def getClassAP(name):
         prec.append((res[name][conf]['TP'] + 1) / (res[name][conf]['TP+FP'] + 1))
         reca.append((res[name][conf]['TP'] + 1) / (res[name][conf]['TP+FN'] + 1))
     print(prec)
+<<<<<<< HEAD
 #    print(reca)
 #    return voc_ap(reca, prec)
 
 
+=======
+    print(reca)
+    return voc_ap(reca, prec)
+
+print(getClassAP('person'))
+
+print(res)
+
+print(voc_ap([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], [1, 0.9, 0.8, 0.7, 0.5, 0.6, 0.3, 0.2, 0.2]))
+>>>>>>> mainwork

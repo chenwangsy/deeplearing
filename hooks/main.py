@@ -27,5 +27,4 @@ print(a.__class__)
 # print(a2_forward)
 # b_forward = getattr(B, 'forward')
 # print(b_forward)
-#
 # print(a_forward == b_forward)

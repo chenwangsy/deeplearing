@@ -12,4 +12,5 @@ UpdaterBaseHook：	     before_train_iter 		->  完成整体外层调用，其�
 
 Updater：		     get_regular_value		->    由于optim内有两个param_groups，因此该函数就是完成了一个循环遍历
 
+
 Hook：			    各个阶段调用函数		->  完成hook的定点触发
